@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+
+# first arg is `-f` or `--some-option`
+if [ "${1#-}" != "$1" ]; then
+	set -- jmeter "$@"
+fi
+
+declare PARAMS=()
+declare T_ARG=
+
+while (( "$#" )); do
+  case "$1" in
+    -t)
+      PARAMS+=($1) && shift
+      PARAMS+=($1) && T_ARG=($1) && shift
+      ;;
+    *)
+      PARAMS+=($1)
+      shift
+      ;;
+  esac
+done
+
+if [ ${T_ARG:-} ]; then
+  PluginsManagerCMD.sh install-for-jmx ${T_ARG}
+fi
+
+# Launch JMeter as sub-process, otherwise fork
+if [[ "${PARAMS[0]}" == "jmeter" ]]; then
+  "${PARAMS[@]}"
+
+  # When JMeter exits, wait 2 seconds for it to come back before exiting
+  while true; do
+    sleep 1
+    if ps x | egrep [o]penjdk >/dev/null; then
+      continue
+    else
+      sleep 2
+      if ! ps x | egrep [o]penjdk >/dev/null; then
+        exit
+      fi
+    fi
+  done
+else
+  exec "${PARAMS[@]}"
+fi
